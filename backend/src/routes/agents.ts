@@ -1,18 +1,13 @@
 import { Router } from 'express'
 import { AgentService } from '../services/agentService'
-import { McpServerService } from '../services/mcpServerService'
 import { RagService } from '../services/ragService'
-import { DatabaseService } from '../services/databaseService'
 import multer from 'multer'
 
-const router = Router()
-const dbService = new DatabaseService()
-const mcpService = new McpServerService(dbService)
-const ragService = RagService.getInstance(dbService)
-const agentService = new AgentService(mcpService, ragService, dbService)
-const upload = multer({ storage: multer.memoryStorage() })
+export function createAgentRoutes(agentService: AgentService, ragService: RagService) {
+  const router = Router()
+  const upload = multer({ storage: multer.memoryStorage() })
 
-// GET /api/agents - List all AI agents
+  // GET /api/agents - List all AI agents
 router.get('/', async (req, res) => {
   try {
     const agents = await agentService.getAgents()
@@ -204,5 +199,6 @@ router.post('/transcribe', upload.single('audio'), async (req, res) => {
   }
 })
 
-export { router as agentRoutes }
+  return router
+}
 
