@@ -414,17 +414,21 @@ export class AgentService {
 
               let result: string
 
-              // Handle available tools
-              if (toolName === 'search_places') {
-                const locationText = args.location || 'your area'
-                // Generic mock response that adapts to the query
-                result = `I found several results for "${args.query}" near ${locationText}. Here are some options:\n\n• Restaurant Option 1 - Highly rated, about 2 miles away\n• Restaurant Option 2 - Popular choice, about 3 miles away\n• Restaurant Option 3 - Good reviews, about 4 miles away\n\nNote: This is a demonstration response. For real location data, the Google Maps API integration needs to be fully implemented with your API key.`
-              } else if (toolName === 'get_directions') {
-                const mode = args.mode || 'driving'
-                const modeEmoji = mode === 'driving' ? '🚗' : mode === 'walking' ? '🚶' : '🚌'
-                result = `${modeEmoji} Here are directions from "${args.origin}" to "${args.destination}" via ${mode}:\n\n• Estimated route available\n• Multiple route options to choose from\n• Real-time traffic conditions would be considered\n\nNote: This is a demonstration response. For actual turn-by-turn directions, the Google Maps API integration needs to be fully implemented with your API key.`
+              // For Google Maps tools, call the MCP server
+              if (toolName === 'search_places' || toolName === 'get_directions') {
+                // Find the Google Maps MCP server ID
+                const googleMapsServerId = '05330f06-9c31-493c-a541-9bd97a7533fe'
+                
+                try {
+                  console.log(`[TOOL] Calling Google Maps MCP server: ${toolName}`)
+                  result = await this.mcpService.executeTool(googleMapsServerId, toolName, args)
+                  console.log(`[TOOL] Google Maps result:`, result)
+                } catch (error) {
+                  console.error(`[TOOL] Error calling Google Maps MCP:`, error)
+                  result = `Error accessing location data: ${error}. Please ensure the Google Maps MCP server is running and configured.`
+                }
               } else {
-                // Try MCP server execution as fallback
+                // Try MCP server execution for other tools
                 const [_, serverId, actualToolName] = toolCall.function.name.split('_', 3)
                 result = await this.mcpService.executeTool(serverId, actualToolName, args)
               }
