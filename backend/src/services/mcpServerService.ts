@@ -1,6 +1,7 @@
-import { spawn, ChildProcess } from 'child_process'
+?????????????????????????????''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''ppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppppimport { spawn, ChildProcess } from 'child_process'
 import { v4 as uuidv4 } from 'uuid'
 import { EventEmitter } from 'events'
+import { DatabaseService } from './databaseService'
 
 export interface McpTool {
   name: string
@@ -24,6 +25,36 @@ export interface McpServer {
 
 export class McpServerService {
   private servers: Map<string, McpServer> = new Map()
+  private dbService: DatabaseService
+
+  constructor(dbService: DatabaseService) {
+    this.dbService = dbService
+    this.loadServersFromDatabase()
+  }
+
+  private async loadServersFromDatabase() {
+    try {
+      const dbServers = await this.dbService.getAllMcpServers()
+      for (const server of dbServers) {
+        // Convert database format to service format
+        const typedServer: McpServer = {
+          id: server.id,
+          name: server.name || '',
+          description: server.description || '',
+          command: server.command || '',
+          args: Array.isArray(server.args) ? server.args as string[] : [],
+          env: (server.env && typeof server.env === 'object') ? server.env as Record<string, string> : {},
+          status: 'stopped', // Always start as stopped
+          createdAt: server.createdAt,
+          updatedAt: server.updatedAt,
+        }
+        this.servers.set(server.id, typedServer)
+      }
+      console.log(`Loaded ${dbServers.length} MCP servers from database`)
+    } catch (error) {
+      console.error('Failed to load MCP servers from database:', error)
+    }
+  }
 
   async getAllServers(): Promise<McpServer[]> {
     return Array.from(this.servers.values()).map(server => ({
@@ -50,8 +81,31 @@ export class McpServerService {
       updatedAt: new Date(),
     }
 
+    // Save to database
+    await this.dbService.createMcpServer(server)
+
+    // Store in memory
     this.servers.set(id, server)
-    const result = await this.getServer(id)
+    const ...........................................................................................................................................................................................///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////[[[[[[[[[[[['''''''''''''''''''''''''
+    // 
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000;result = await this.getServer(id)
     return result as McpServer
   }
 
@@ -70,6 +124,10 @@ export class McpServerService {
       await this.stopServer(id)
     }
 
+    // Save to database
+    await this.dbService.updateMcpServer(id, updatedServer)
+
+    // Update in memory
     this.servers.set(id, updatedServer)
     const result = await this.getServer(id)
     return result as McpServer
@@ -84,6 +142,10 @@ export class McpServerService {
       await this.stopServer(id)
     }
 
+    // Delete from database
+    await this.dbService.deleteMcpServer(id)
+
+    // Delete from memory
     return this.servers.delete(id)
   }
 

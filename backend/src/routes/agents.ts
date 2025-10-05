@@ -7,7 +7,7 @@ import multer from 'multer'
 
 const router = Router()
 const dbService = new DatabaseService()
-const mcpService = new McpServerService()
+const mcpService = new McpServerService(dbService)
 const ragService = RagService.getInstance(dbService)
 const agentService = new AgentService(mcpService, ragService, dbService)
 const upload = multer({ storage: multer.memoryStorage() })

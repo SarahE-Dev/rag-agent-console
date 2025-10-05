@@ -1,8 +1,10 @@
 import { Router } from 'express'
 import { McpServerService } from '../services/mcpServerService'
+import { DatabaseService } from '../services/databaseService'
 
 const router = Router()
-const mcpService = new McpServerService()
+const dbService = new DatabaseService()
+const mcpService = new McpServerService(dbService)
 
 // GET /api/mcp/servers - List all MCP servers
 router.get('/servers', async (req, res) => {
