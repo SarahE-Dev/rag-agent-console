@@ -226,7 +226,7 @@ export function McpServerManager() {
                 </div>
                 <div className="flex gap-2">
                   {server.status === 'stopped' ? (
-                    <Button size="sm" className="bg-neon-green hover:bg-neon-green/80 text-black font-bold shadow-neon-green" onClick={() => handleStartServer(server.id)}>
+                    <Button size="sm" className="bg-neon-cyan hover:bg-neon-cyan/80 text-black font-bold shadow-neon-cyan" onClick={() => handleStartServer(server.id)}>
                       <Play className="w-4 h-4 fill-current" />
                     </Button>
                   ) : (
