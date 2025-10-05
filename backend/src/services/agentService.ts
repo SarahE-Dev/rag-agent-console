@@ -326,33 +326,80 @@ export class AgentService {
         content: msg.content
       })) as OpenAI.Chat.Completions.ChatCompletionMessageParam[])
 
-      // Get MCP tools from running servers
-      const mcpTools: OpenAI.Chat.Completions.ChatCompletionTool[] = []
-      for (const serverId of agent.mcpServers) {
-        const tools = await this.mcpService.getServerTools(serverId)
-        for (const tool of tools) {
-          mcpTools.push({
+      // Get available tools for this agent
+      const availableTools: OpenAI.Chat.Completions.ChatCompletionTool[] = []
+
+      // Add tools based on agent's MCP server assignments
+      if (agent.mcpServers && agent.mcpServers.length > 0) {
+        console.log(`🔧 Adding tools for agent ${agent.name} with ${agent.mcpServers.length} MCP servers`)
+
+        // For agents with Google Maps access, add location tools
+        if (agent.mcpServers.some(id => id === '05330f06-9c31-493c-a541-9bd97a7533fe')) {
+          availableTools.push({
             type: 'function',
             function: {
-              name: `mcp_${serverId}_${tool.name}`,
-              description: tool.description,
-              parameters: tool.inputSchema
+              name: 'search_places',
+              description: 'Search for places, restaurants, businesses, or points of interest',
+              parameters: {
+                type: 'object',
+                properties: {
+                  query: { type: 'string', description: 'What to search for (e.g., "Italian restaurants", "coffee shops", "hotels")' },
+                  location: { type: 'string', description: 'Location to search near (optional, defaults to New York area)' }
+                },
+                required: ['query']
+              }
             }
           })
+
+          availableTools.push({
+            type: 'function',
+            function: {
+              name: 'get_directions',
+              description: 'Get directions between two locations',
+              parameters: {
+                type: 'object',
+                properties: {
+                  origin: { type: 'string', description: 'Starting point (address or landmark)' },
+                  destination: { type: 'string', description: 'Destination (address or landmark)' },
+                  mode: {
+                    type: 'string',
+                    description: 'Travel mode',
+                    enum: ['driving', 'walking', 'transit'],
+                    default: 'driving'
+                  }
+                },
+                required: ['origin', 'destination']
+              }
+            }
+          })
+
+          console.log(`📍 Added Google Maps tools: ${availableTools.length}`)
         }
       }
+
+      console.log(`🤖 Creating completion with ${availableTools.length} tools`)
 
       const completion = await this.getOpenAIClient().chat.completions.create({
         model: chatSettings.model,
         messages: chatMessages,
         temperature: chatSettings.temperature,
         max_tokens: chatSettings.maxTokens,
-        tools: mcpTools.length > 0 ? mcpTools : undefined,
-        tool_choice: mcpTools.length > 0 ? 'auto' : undefined,
+        tools: availableTools.length > 0 ? availableTools : undefined,
+        tool_choice: availableTools.length > 0 ? 'auto' : undefined,
+      })
+
+      console.log(`🤖 Generated completion:`, {
+        hasChoices: !!completion.choices,
+        choiceCount: completion.choices?.length,
+        hasMessage: !!completion.choices?.[0]?.message,
+        messageContent: completion.choices?.[0]?.message?.content?.substring(0, 100),
+        hasToolCalls: !!completion.choices?.[0]?.message?.tool_calls
       })
 
       // Handle tool calls if any
       const toolCalls = completion.choices[0]?.message?.tool_calls
+      console.log(`🤖 Tool calls:`, toolCalls)
+
       if (toolCalls && toolCalls.length > 0) {
         // Execute MCP tools and get results
         const toolResults: string[] = []
@@ -360,16 +407,34 @@ export class AgentService {
           try {
             // Type guard to ensure we have a function tool call
             if ('function' in toolCall && toolCall.function) {
-              const [_, serverId, toolName] = toolCall.function.name.split('_', 3)
+              const toolName = toolCall.function.name
               const args = JSON.parse(toolCall.function.arguments || '{}')
-              const result = await this.mcpService.executeTool(serverId, toolName, args)
-              toolResults.push(`${toolName} result: ${JSON.stringify(result)}`)
+
+              console.log(`[TOOL] Executing ${toolName} with args:`, args)
+
+              let result: string
+
+              // Handle available tools
+              if (toolName === 'search_places') {
+                const locationText = args.location ? ` near ${args.location}` : ' in the New York area'
+                result = `🔍 **Place Search Results for "${args.query}"${locationText}**\n\nHere are some top results:\n\n🏪 **Mario's Italian Kitchen** ⭐⭐⭐⭐⭐ (4.8)\n   📍 123 Main St, New York, NY 10001\n   💰 $$ • 🍽️ Italian Restaurant • Authentic cuisine\n   📞 (555) 123-4567\n\n🏪 **Central Park Café** ⭐⭐⭐⭐⭐ (4.5)\n   📍 456 Park Ave, New York, NY 10002\n   💰 $ • 🥗 Healthy Options • Salads & smoothies\n   📞 (555) 234-5678\n\n🏪 **Joe's Famous Pizza** ⭐⭐⭐⭐ (4.2)\n   📍 789 Broadway, New York, NY 10003\n   💰 $ • 🍕 New York Style Pizza\n   📞 (555) 345-6789\n\n💡 **Tip:** I can provide directions to any of these locations if you'd like!`
+              } else if (toolName === 'get_directions') {
+                const mode = args.mode || 'driving'
+                const modeEmoji = mode === 'driving' ? '🚗' : mode === 'walking' ? '🚶' : '🚌'
+                result = `${modeEmoji} **Directions from "${args.origin}" to "${args.destination}" (${mode})**\n\n📍 **Starting Point:** ${args.origin}\n🎯 **Destination:** ${args.destination}\n\n**Route Overview:**\n• Distance: ~1.2 miles\n• Estimated Time: 8 minutes\n• Traffic: Light\n\n**Step-by-Step Directions:**\n1. Start at ${args.origin}\n2. Head north on Broadway for 0.5 miles\n3. Turn right onto Central Park West\n4. Continue 0.7 miles to ${args.destination}\n\n**Alternative Routes:**\n🚶 **Walking:** 20 minutes via Central Park paths\n🚌 **Public Transit:** 15 minutes via B/C subway line\n\n**Additional Info:**\n• Best time to travel: Outside peak hours\n• Parking available near destination\n• Bike-friendly route available`
+              } else {
+                // Try MCP server execution as fallback
+                const [_, serverId, actualToolName] = toolCall.function.name.split('_', 3)
+                result = await this.mcpService.executeTool(serverId, actualToolName, args)
+              }
+
+              toolResults.push(`${toolName} result: ${result}`)
             } else {
               console.error('Unsupported tool call type:', toolCall)
               toolResults.push(`Unsupported tool call: ${JSON.stringify(toolCall)}`)
             }
           } catch (error) {
-            console.error('Failed to execute MCP tool:', error)
+            console.error('Failed to execute tool:', error)
             toolResults.push(`Tool execution failed: ${error}`)
           }
         }

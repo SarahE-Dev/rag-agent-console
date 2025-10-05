@@ -149,7 +149,17 @@ router.get('/:id/status', async (req, res) => {
 // POST /api/agents/:id/chat - Send chat message to agent
 router.post('/:id/chat', async (req, res) => {
   try {
-    const { messages } = req.body
+    // Accept either 'message' (string) or 'messages' (array)
+    let messages = req.body.messages
+    if (!messages && req.body.message) {
+      // Convert single message to messages array
+      messages = [{ role: 'user', content: req.body.message }]
+    }
+    
+    if (!messages || !Array.isArray(messages)) {
+      return res.status(400).json({ error: 'Invalid request: missing message or messages' })
+    }
+
     const response = await agentService.generateChatResponse(req.params.id, messages)
     if (response === null) {
       return res.status(400).json({ error: 'Agent not configured for chat or not found' })

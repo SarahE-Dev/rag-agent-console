@@ -3,6 +3,24 @@ import { v4 as uuidv4 } from 'uuid'
 import { EventEmitter } from 'events'
 import { DatabaseService } from './databaseService'
 
+interface JsonRpcRequest {
+  jsonrpc: '2.0'
+  id: number
+  method: string
+  params?: any
+}
+
+interface JsonRpcResponse {
+  jsonrpc: '2.0'
+  id: number
+  result?: any
+  error?: {
+    code: number
+    message: string
+    data?: any
+  }
+}
+
 export interface McpTool {
   name: string
   description: string
@@ -26,10 +44,89 @@ export interface McpServer {
 export class McpServerService {
   private servers: Map<string, McpServer> = new Map()
   private dbService: DatabaseService
+  private requestId = 0
 
   constructor(dbService: DatabaseService) {
     this.dbService = dbService
     this.loadServersFromDatabase()
+  }
+
+  private async sendJsonRpcRequest(server: McpServer, method: string, params?: any): Promise<any> {
+    if (!server.process || server.status !== 'running') {
+      throw new Error('MCP server not running')
+    }
+
+    const request: JsonRpcRequest = {
+      jsonrpc: '2.0',
+      id: ++this.requestId,
+      method,
+      params
+    }
+
+    const requestJson = JSON.stringify(request) + '\n'
+
+    console.log(`[MCP ${server.name}] Sending request:`, requestJson.trim())
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('MCP server request timeout'))
+      }, 10000) // 10 second timeout
+
+      let responseBuffer = ''
+
+      const onData = (data: Buffer) => {
+        const chunk = data.toString()
+        console.log(`[MCP ${server.name}] Received chunk:`, chunk.trim())
+
+        responseBuffer += chunk
+
+        // Look for complete JSON objects (basic approach)
+        const startBrace = responseBuffer.indexOf('{')
+        const endBrace = responseBuffer.lastIndexOf('}')
+
+        if (startBrace !== -1 && endBrace !== -1 && endBrace > startBrace) {
+          const jsonCandidate = responseBuffer.substring(startBrace, endBrace + 1)
+
+          try {
+            const response: JsonRpcResponse = JSON.parse(jsonCandidate)
+            console.log(`[MCP ${server.name}] Parsed response:`, response)
+
+            if (response.id === request.id) {
+              clearTimeout(timeout)
+              server.process!.stdout!.off('data', onData)
+
+              if (response.error) {
+                reject(new Error(`MCP server error: ${response.error.message}`))
+              } else {
+                resolve(response.result)
+              }
+              return
+            }
+          } catch (e) {
+            console.log(`[MCP ${server.name}] Failed to parse JSON:`, (e as Error).message)
+          }
+        }
+      }
+
+      server.process!.stdout!.on('data', onData)
+      server.process!.stdin!.write(requestJson)
+    })
+  }
+
+  private async sendJsonRpcNotification(server: McpServer, method: string, params?: any): Promise<void> {
+    if (!server.process || server.status !== 'running') {
+      throw new Error('MCP server not running')
+    }
+
+    const notification = {
+      jsonrpc: '2.0',
+      method,
+      params
+    }
+
+    const notificationJson = JSON.stringify(notification) + '\n'
+    console.log(`[MCP ${server.name}] Sending notification:`, notificationJson.trim())
+    server.process!.stdin!.write(notificationJson)
   }
 
   private async loadServersFromDatabase() {
@@ -213,86 +310,154 @@ export class McpServerService {
   }
 
   async getServerTools(id: string): Promise<McpTool[]> {
-    const server = this.servers.get(id)
-    if (!server || server.status !== 'running') return []
-
-    // Return cached tools if available
-    if (server.tools) return server.tools
-
     try {
-      // For now, return mock tools - in a real implementation, you'd:
-      // 1. Send JSON-RPC "tools/list" request to the MCP server
-      // 2. Parse the response and return actual tools
-      // 3. Cache the tools for future use
+      const server = this.servers.get(id)
+      if (!server || server.status !== 'running') {
+        console.log(`[MCP] Server ${id} not found or not running`)
+        return []
+      }
 
-      const mockTools: McpTool[] = [
-        {
-          name: 'search_web',
-          description: 'Search the web for information',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              query: { type: 'string', description: 'Search query' }
-            },
-            required: ['query']
+      // Return cached tools if available
+      if (server.tools) {
+        console.log(`[MCP ${server.name}] Returning cached tools:`, server.tools.length)
+        return server.tools
+      }
+
+      console.log(`[MCP ${server.name}] Getting tools...`)
+
+      // For now, return hardcoded Google Maps tools to test the agent service
+      // TODO: Implement proper MCP communication
+      if (server.name === 'Google maps') {
+        const googleMapsTools: McpTool[] = [
+          {
+            name: 'maps_search_places',
+            description: 'Search for places using Google Places API',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                query: { type: 'string', description: 'Search query' },
+                location: {
+                  type: 'object',
+                  properties: {
+                    latitude: { type: 'number' },
+                    longitude: { type: 'number' }
+                  },
+                  description: 'Optional center point for the search'
+                },
+                radius: { type: 'number', description: 'Search radius in meters (max 50000)' }
+              },
+              required: ['query']
+            }
+          },
+          {
+            name: 'maps_geocode',
+            description: 'Convert an address into geographic coordinates',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                address: { type: 'string', description: 'The address to geocode' }
+              },
+              required: ['address']
+            }
+          },
+          {
+            name: 'maps_directions',
+            description: 'Get directions between two points',
+            inputSchema: {
+              type: 'object',
+              properties: {
+                origin: { type: 'string', description: 'Starting point address or coordinates' },
+                destination: { type: 'string', description: 'Ending point address or coordinates' },
+                mode: {
+                  type: 'string',
+                  description: 'Travel mode (driving, walking, bicycling, transit)',
+                  enum: ['driving', 'walking', 'bicycling', 'transit']
+                }
+              },
+              required: ['origin', 'destination']
+            }
           }
-        },
-        {
-          name: 'get_weather',
-          description: 'Get current weather information',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              location: { type: 'string', description: 'City or location' }
-            },
-            required: ['location']
-          }
-        },
-        {
-          name: 'calculate',
-          description: 'Perform mathematical calculations',
-          inputSchema: {
-            type: 'object',
-            properties: {
-              expression: { type: 'string', description: 'Mathematical expression' }
-            },
-            required: ['expression']
-          }
+        ]
+
+        console.log(`[MCP ${server.name}] Returning hardcoded Google Maps tools:`, googleMapsTools.map(t => t.name))
+
+        // Cache the tools
+        server.tools = googleMapsTools
+        return googleMapsTools
+      }
+
+      // Fallback: try MCP communication
+      try {
+        // Send JSON-RPC "tools/list" request to get available tools
+        console.log(`[MCP ${server.name}] Sending tools/list request...`)
+        const result = await this.sendJsonRpcRequest(server, 'tools/list')
+        console.log(`[MCP ${server.name}] Tools/list response:`, result)
+
+        if (result && result.tools && Array.isArray(result.tools)) {
+          // Convert MCP tool format to our internal format
+          const tools: McpTool[] = result.tools.map((tool: any) => ({
+            name: tool.name,
+            description: tool.description || '',
+            inputSchema: tool.inputSchema || {}
+          }))
+
+          console.log(`[MCP ${server.name}] Parsed tools:`, tools.map(t => t.name))
+
+          // Cache the tools
+          server.tools = tools
+          return tools
         }
-      ]
+      } catch (mcpError) {
+        console.log(`[MCP ${server.name}] MCP communication failed, using empty tools:`, (mcpError as Error).message)
+      }
 
-      server.tools = mockTools
-      return mockTools
+      console.log(`[MCP ${server.name}] No tools available`)
+      return []
     } catch (error) {
-      console.error(`Failed to get tools from MCP server ${server.name}:`, error)
+      console.error(`Failed to get tools from MCP server ${id}:`, error)
       return []
     }
   }
 
   async executeTool(serverId: string, toolName: string, args: any): Promise<any> {
-    const server = this.servers.get(serverId)
-    if (!server || server.status !== 'running') {
-      throw new Error('MCP server not running')
-    }
-
     try {
-      // Mock tool execution - in a real implementation, you'd:
-      // 1. Send JSON-RPC "tools/call" request to the MCP server
-      // 2. Pass the tool name and arguments
-      // 3. Return the tool's response
+      const server = this.servers.get(serverId)
+      if (!server || server.status !== 'running') {
+        throw new Error(`MCP server ${serverId} not running`)
+      }
 
-      switch (toolName) {
-        case 'search_web':
-          return { result: `Mock search results for: ${args.query}` }
-        case 'get_weather':
-          return { result: `Mock weather for ${args.location}: 72°F, Sunny` }
-        case 'calculate':
-          return { result: `Mock calculation result for: ${args.expression} = 42` }
-        default:
-          throw new Error(`Unknown tool: ${toolName}`)
+      console.log(`[MCP ${server.name}] Executing tool ${toolName} with args:`, args)
+
+      // For now, return mock results for Google Maps tools to test the agent service
+      // TODO: Implement proper MCP tool execution
+      if (server.name === 'Google maps') {
+        switch (toolName) {
+          case 'maps_search_places':
+            return `Found several places matching "${args.query}" near ${args.location ? `(${args.location.latitude}, ${args.location.longitude})` : 'Central Park'}. Here are some results: 1. Joe's Pizza - Italian restaurant, 4.2 stars, 123 Main St. 2. Central Park Deli - American cuisine, 4.0 stars, 456 Park Ave. 3. Garden Café - Healthy options, 4.5 stars, 789 Broadway.`
+          case 'maps_geocode':
+            return `Geocoded "${args.address}": Location: (40.7829, -73.9654), Formatted Address: ${args.address}, New York, NY, USA`
+          case 'maps_directions':
+            return `Directions from "${args.origin}" to "${args.destination}" via ${args.mode || 'driving'}: 1. Start at ${args.origin}. 2. Head north on Broadway for 0.5 miles. 3. Turn right onto Central Park West. 4. Continue for 0.3 miles. 5. Arrive at ${args.destination}. Total distance: 0.8 miles, Estimated time: 5 minutes.`
+          default:
+            throw new Error(`Unknown tool: ${toolName}`)
+        }
+      }
+
+      // Fallback: try MCP communication
+      try {
+        const result = await this.sendJsonRpcRequest(server, 'tools/call', {
+          name: toolName,
+          arguments: args
+        })
+
+        console.log(`[MCP ${server.name}] Tool ${toolName} result:`, result)
+        return result
+      } catch (mcpError) {
+        console.log(`[MCP ${server.name}] MCP tool execution failed:`, (mcpError as Error).message)
+        throw new Error(`Tool execution failed: ${toolName}`)
       }
     } catch (error) {
-      console.error(`Failed to execute tool ${toolName} on server ${server.name}:`, error)
+      console.error(`Failed to execute tool ${toolName} on server ${serverId}:`, error)
       throw error
     }
   }
