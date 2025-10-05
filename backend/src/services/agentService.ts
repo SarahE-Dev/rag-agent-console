@@ -328,53 +328,38 @@ export class AgentService {
 
       // Get available tools for this agent
       const availableTools: OpenAI.Chat.Completions.ChatCompletionTool[] = []
+      const toolToServerMap = new Map<string, string>() // Map tool name to server ID
 
-      // Add tools based on agent's MCP server assignments
+      // Dynamically load tools from all assigned MCP servers
       if (agent.mcpServers && agent.mcpServers.length > 0) {
-        console.log(`🔧 Adding tools for agent ${agent.name} with ${agent.mcpServers.length} MCP servers`)
+        console.log(`🔧 Loading tools for agent ${agent.name} from ${agent.mcpServers.length} MCP servers`)
 
-        // For agents with Google Maps access, add location tools
-        if (agent.mcpServers.some(id => id === '05330f06-9c31-493c-a541-9bd97a7533fe')) {
-          availableTools.push({
-            type: 'function',
-            function: {
-              name: 'search_places',
-              description: 'Search for places, restaurants, businesses, or points of interest',
-              parameters: {
-                type: 'object',
-                properties: {
-                  query: { type: 'string', description: 'What to search for (e.g., "Italian restaurants", "coffee shops", "hotels")' },
-                  location: { type: 'string', description: 'Location to search near (optional, defaults to New York area)' }
-                },
-                required: ['query']
-              }
+        for (const serverId of agent.mcpServers) {
+          try {
+            const mcpTools = await this.mcpService.getServerTools(serverId)
+            console.log(`📦 Found ${mcpTools.length} tools from server ${serverId}`)
+
+            for (const tool of mcpTools) {
+              // Convert MCP tool format to OpenAI function format
+              availableTools.push({
+                type: 'function',
+                function: {
+                  name: tool.name,
+                  description: tool.description || '',
+                  parameters: tool.inputSchema || { type: 'object', properties: {} }
+                }
+              })
+
+              // Map tool name to server ID for execution
+              toolToServerMap.set(tool.name, serverId)
+              console.log(`  ✅ Added tool: ${tool.name}`)
             }
-          })
-
-          availableTools.push({
-            type: 'function',
-            function: {
-              name: 'get_directions',
-              description: 'Get directions between two locations',
-              parameters: {
-                type: 'object',
-                properties: {
-                  origin: { type: 'string', description: 'Starting point (address or landmark)' },
-                  destination: { type: 'string', description: 'Destination (address or landmark)' },
-                  mode: {
-                    type: 'string',
-                    description: 'Travel mode',
-                    enum: ['driving', 'walking', 'transit'],
-                    default: 'driving'
-                  }
-                },
-                required: ['origin', 'destination']
-              }
-            }
-          })
-
-          console.log(`📍 Added Google Maps tools: ${availableTools.length}`)
+          } catch (error) {
+            console.error(`❌ Failed to load tools from server ${serverId}:`, error)
+          }
         }
+
+        console.log(`📍 Total tools available: ${availableTools.length}`)
       }
 
       console.log(`🤖 Creating completion with ${availableTools.length} tools`)
@@ -414,23 +399,21 @@ export class AgentService {
 
               let result: string
 
-              // For Google Maps tools, call the MCP server
-              if (toolName === 'search_places' || toolName === 'get_directions') {
-                // Find the Google Maps MCP server ID
-                const googleMapsServerId = '05330f06-9c31-493c-a541-9bd97a7533fe'
-                
-                try {
-                  console.log(`[TOOL] Calling Google Maps MCP server: ${toolName}`)
-                  result = await this.mcpService.executeTool(googleMapsServerId, toolName, args)
-                  console.log(`[TOOL] Google Maps result:`, result)
-                } catch (error) {
-                  console.error(`[TOOL] Error calling Google Maps MCP:`, error)
-                  result = `Error accessing location data: ${error}. Please ensure the Google Maps MCP server is running and configured.`
-                }
+              // Look up which server provides this tool
+              const serverId = toolToServerMap.get(toolName)
+              
+              if (!serverId) {
+                console.error(`[TOOL] No server found for tool: ${toolName}`)
+                result = `Error: Tool "${toolName}" is not registered with any MCP server.`
               } else {
-                // Try MCP server execution for other tools
-                const [_, serverId, actualToolName] = toolCall.function.name.split('_', 3)
-                result = await this.mcpService.executeTool(serverId, actualToolName, args)
+                try {
+                  console.log(`[TOOL] Calling MCP server ${serverId} for tool: ${toolName}`)
+                  result = await this.mcpService.executeTool(serverId, toolName, args)
+                  console.log(`[TOOL] Result from ${toolName}:`, result?.substring(0, 200))
+                } catch (error) {
+                  console.error(`[TOOL] Error calling MCP server:`, error)
+                  result = `Error executing tool "${toolName}": ${error}. Please ensure the MCP server is running and configured.`
+                }
               }
 
               toolResults.push(`${toolName} result: ${result}`)

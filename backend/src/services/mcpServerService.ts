@@ -229,11 +229,19 @@ export class McpServerService {
 
   async startServer(id: string): Promise<boolean> {
     const server = this.servers.get(id)
-    if (!server) return false
+    if (!server) {
+      console.error(`[MCP] Server ${id} not found`)
+      throw new Error(`MCP server not found: ${id}`)
+    }
 
-    if (server.status === 'running') return true
+    if (server.status === 'running') {
+      console.log(`[MCP] Server ${server.name} already running`)
+      return true
+    }
 
     try {
+      console.log(`[MCP] Starting server ${server.name} with command: ${server.command} ${server.args.join(' ')}`)
+      
       const serverProcess = spawn(server.command, server.args, {
         env: { ...process.env, ...server.env },
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -248,14 +256,14 @@ export class McpServerService {
         server.status = code === 0 ? 'stopped' : 'error'
         server.updatedAt = new Date()
         server.process = undefined
-        console.log(`MCP server ${server.name} exited with code ${code}`)
+        console.log(`[MCP] Server ${server.name} exited with code ${code}`)
       })
 
       serverProcess.on('error', (error: Error) => {
         server.status = 'error'
         server.updatedAt = new Date()
         server.process = undefined
-        console.error(`MCP server ${server.name} error:`, error)
+        console.error(`[MCP] Server ${server.name} spawn error:`, error)
       })
 
       // Log stdout and stderr
@@ -264,47 +272,76 @@ export class McpServerService {
       })
 
       serverProcess.stderr?.on('data', (data: Buffer) => {
-        console.error(`[${server.name}] ${data.toString().trim()}`)
+        console.error(`[${server.name} stderr] ${data.toString().trim()}`)
       })
 
+      console.log(`[MCP] Server ${server.name} started successfully`)
       return true
     } catch (error) {
-      console.error(`Failed to start MCP server ${server.name}:`, error)
+      console.error(`[MCP] Failed to start server ${server.name}:`, error)
       server.status = 'error'
       server.updatedAt = new Date()
-      return false
+      throw error
     }
   }
 
   async stopServer(id: string): Promise<boolean> {
     const server = this.servers.get(id)
-    if (!server) return false
+    if (!server) {
+      console.error(`[MCP] Server ${id} not found`)
+      return false
+    }
 
-    if (server.status !== 'running' || !server.process) return true
+    if (server.status !== 'running' || !server.process) {
+      console.log(`[MCP] Server ${server.name} already stopped`)
+      server.status = 'stopped'
+      server.process = undefined
+      return true
+    }
 
     try {
-      server.process.kill('SIGTERM')
-
-      // Wait for the process to exit or timeout after 5 seconds
-      const timeout = setTimeout(() => {
-        if (server.process) {
-          server.process.kill('SIGKILL')
-        }
-      }, 5000)
-
+      console.log(`[MCP] Stopping server ${server.name}...`)
+      
       return new Promise((resolve) => {
-        const checkExit = () => {
-          if (server.status === 'stopped') {
-            clearTimeout(timeout)
-            resolve(true)
-          } else {
-            setTimeout(checkExit, 100)
+        const process = server.process!
+        
+        // Set up timeout for force kill
+        const timeout = setTimeout(() => {
+          console.log(`[MCP] Force killing ${server.name} after timeout`)
+          try {
+            process.kill('SIGKILL')
+          } catch (e) {
+            console.error(`[MCP] Error force killing:`, e)
           }
+          server.status = 'stopped'
+          server.process = undefined
+          resolve(true)
+        }, 5000)
+
+        // Listen for exit
+        process.once('exit', () => {
+          clearTimeout(timeout)
+          server.status = 'stopped'
+          server.process = undefined
+          console.log(`[MCP] Server ${server.name} stopped successfully`)
+          resolve(true)
+        })
+
+        // Send termination signal
+        try {
+          process.kill('SIGTERM')
+        } catch (e) {
+          clearTimeout(timeout)
+          console.error(`[MCP] Error sending SIGTERM:`, e)
+          server.status = 'stopped'
+          server.process = undefined
+          resolve(false)
         }
-        checkExit()
       })
     } catch (error) {
-      console.error(`Failed to stop MCP server ${server.name}:`, error)
+      console.error(`[MCP] Failed to stop server ${server.name}:`, error)
+      server.status = 'stopped'
+      server.process = undefined
       return false
     }
   }

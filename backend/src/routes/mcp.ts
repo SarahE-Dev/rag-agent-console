@@ -101,7 +101,7 @@ router.post('/servers/:id/start', async (req, res) => {
     if (!success) {
       return res.status(404).json({ error: 'MCP server not found' })
     }
-    res.json({ status: 'started' })
+    res.json({ status: 'running' })
   } catch (error) {
     console.error('Error starting MCP server:', error)
     res.status(500).json({ error: 'Failed to start MCP server' })
