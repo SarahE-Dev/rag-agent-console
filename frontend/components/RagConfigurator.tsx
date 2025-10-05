@@ -224,7 +224,7 @@ export function RagConfigurator() {
               const vectorStoresResponse = await fetch('/api/rag/vectorstores')
               if (vectorStoresResponse.ok) {
                 const allVectorStores = await vectorStoresResponse.json()
-                const newVectorStore = allVectorStores.find((vs: any) => vs.id === `datastore_${createdDataSourceId}`)
+                const newVectorStore = allVectorStores.find((vs: any) => vs.id === `datastore_${dataSourceId}`)
 
                 if (newVectorStore) {
                   // Notify other components with the new vector store data
