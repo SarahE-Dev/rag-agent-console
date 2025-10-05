@@ -416,12 +416,13 @@ export class AgentService {
 
               // Handle available tools
               if (toolName === 'search_places') {
-                const locationText = args.location ? ` near ${args.location}` : ' in the New York area'
-                result = `🔍 **Place Search Results for "${args.query}"${locationText}**\n\nHere are some top results:\n\n🏪 **Mario's Italian Kitchen** ⭐⭐⭐⭐⭐ (4.8)\n   📍 123 Main St, New York, NY 10001\n   💰 $$ • 🍽️ Italian Restaurant • Authentic cuisine\n   📞 (555) 123-4567\n\n🏪 **Central Park Café** ⭐⭐⭐⭐⭐ (4.5)\n   📍 456 Park Ave, New York, NY 10002\n   💰 $ • 🥗 Healthy Options • Salads & smoothies\n   📞 (555) 234-5678\n\n🏪 **Joe's Famous Pizza** ⭐⭐⭐⭐ (4.2)\n   📍 789 Broadway, New York, NY 10003\n   💰 $ • 🍕 New York Style Pizza\n   📞 (555) 345-6789\n\n💡 **Tip:** I can provide directions to any of these locations if you'd like!`
+                const locationText = args.location || 'your area'
+                // Generic mock response that adapts to the query
+                result = `I found several results for "${args.query}" near ${locationText}. Here are some options:\n\n• Restaurant Option 1 - Highly rated, about 2 miles away\n• Restaurant Option 2 - Popular choice, about 3 miles away\n• Restaurant Option 3 - Good reviews, about 4 miles away\n\nNote: This is a demonstration response. For real location data, the Google Maps API integration needs to be fully implemented with your API key.`
               } else if (toolName === 'get_directions') {
                 const mode = args.mode || 'driving'
                 const modeEmoji = mode === 'driving' ? '🚗' : mode === 'walking' ? '🚶' : '🚌'
-                result = `${modeEmoji} **Directions from "${args.origin}" to "${args.destination}" (${mode})**\n\n📍 **Starting Point:** ${args.origin}\n🎯 **Destination:** ${args.destination}\n\n**Route Overview:**\n• Distance: ~1.2 miles\n• Estimated Time: 8 minutes\n• Traffic: Light\n\n**Step-by-Step Directions:**\n1. Start at ${args.origin}\n2. Head north on Broadway for 0.5 miles\n3. Turn right onto Central Park West\n4. Continue 0.7 miles to ${args.destination}\n\n**Alternative Routes:**\n🚶 **Walking:** 20 minutes via Central Park paths\n🚌 **Public Transit:** 15 minutes via B/C subway line\n\n**Additional Info:**\n• Best time to travel: Outside peak hours\n• Parking available near destination\n• Bike-friendly route available`
+                result = `${modeEmoji} Here are directions from "${args.origin}" to "${args.destination}" via ${mode}:\n\n• Estimated route available\n• Multiple route options to choose from\n• Real-time traffic conditions would be considered\n\nNote: This is a demonstration response. For actual turn-by-turn directions, the Google Maps API integration needs to be fully implemented with your API key.`
               } else {
                 // Try MCP server execution as fallback
                 const [_, serverId, actualToolName] = toolCall.function.name.split('_', 3)

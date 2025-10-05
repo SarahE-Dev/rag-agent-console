@@ -78,19 +78,35 @@ export function McpServerManager() {
 
   const handleStartServer = async (serverId: string) => {
     try {
-      await fetch(`/api/mcp/servers/${serverId}/start`, { method: 'POST' })
+      const response = await fetch(`/api/mcp/servers/${serverId}/start`, { method: 'POST' })
+      if (!response.ok) {
+        const error = await response.json()
+        console.error('Failed to start MCP server:', error)
+        alert(`Failed to start server: ${error.error || 'Unknown error'}`)
+      }
+      // Wait a moment for the server to start
+      await new Promise(resolve => setTimeout(resolve, 500))
       fetchServers()
     } catch (error) {
       console.error('Failed to start MCP server:', error)
+      alert('Network error while starting server')
     }
   }
 
   const handleStopServer = async (serverId: string) => {
     try {
-      await fetch(`/api/mcp/servers/${serverId}/stop`, { method: 'POST' })
+      const response = await fetch(`/api/mcp/servers/${serverId}/stop`, { method: 'POST' })
+      if (!response.ok) {
+        const error = await response.json()
+        console.error('Failed to stop MCP server:', error)
+        alert(`Failed to stop server: ${error.error || 'Unknown error'}`)
+      }
+      // Wait a moment for the server to stop
+      await new Promise(resolve => setTimeout(resolve, 500))
       fetchServers()
     } catch (error) {
       console.error('Failed to stop MCP server:', error)
+      alert('Network error while stopping server')
     }
   }
 
@@ -210,12 +226,12 @@ export function McpServerManager() {
                 </div>
                 <div className="flex gap-2">
                   {server.status === 'stopped' ? (
-                    <Button size="sm" className="bg-neon-green hover:bg-neon-green/80 text-black font-bold" onClick={() => handleStartServer(server.id)}>
-                      <Play className="w-4 h-4" />
+                    <Button size="sm" className="bg-neon-green hover:bg-neon-green/80 text-black font-bold shadow-neon-green" onClick={() => handleStartServer(server.id)}>
+                      <Play className="w-4 h-4 fill-current" />
                     </Button>
                   ) : (
-                    <Button size="sm" variant="outline" className="border-neon-pink hover:bg-neon-pink/20" onClick={() => handleStopServer(server.id)}>
-                      <Square className="w-4 h-4" />
+                    <Button size="sm" variant="outline" className="border-neon-pink hover:bg-neon-pink/20 text-neon-pink shadow-neon-pink" onClick={() => handleStopServer(server.id)}>
+                      <Square className="w-4 h-4 fill-current" />
                     </Button>
                   )}
                   <Button size="sm" variant="cyber">
