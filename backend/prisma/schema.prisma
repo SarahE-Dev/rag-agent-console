@@ -1,0 +1,164 @@
+// Prisma schema for AI Agents Platform
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// MCP Servers
+model McpServer {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  command     String
+  args        String[] // JSON array of arguments
+  env         Json?    // Environment variables as JSON
+  status      String   @default("stopped") // 'stopped' | 'running' | 'error'
+  tools       Json?    // Cached MCP tools as JSON
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("mcp_servers")
+}
+
+// RAG Data Sources
+model RagDataSource {
+  id         String   @id @default(cuid())
+  name       String
+  type       String   // 'file' | 'directory' | 'url' | 'database' | 'api'
+  path       String?
+  url        String?
+  connectionString String?
+  apiKey     String?
+  headers    Json?    // HTTP headers as JSON
+  status     String   @default("configured") // 'configured' | 'processing' | 'ready' | 'error'
+  documentCount Int?
+  lastIndexed DateTime?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("rag_data_sources")
+}
+
+// RAG Embedding Models
+model RagEmbeddingModel {
+  id        String   @id @default(cuid())
+  name      String
+  provider  String   // 'openai' | 'huggingface' | 'local' | 'custom'
+  modelName String
+  apiKey    String?
+  endpoint  String?
+  dimensions Int
+  status    String   @default("configured") // 'configured' | 'ready' | 'error'
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("rag_embedding_models")
+}
+
+// RAG Vector Stores
+model RagVectorStore {
+  id         String   @id @default(cuid())
+  name       String
+  provider   String   // 'chromadb' | 'pinecone' | 'weaviate' | 'qdrant' | 'local'
+  host       String?
+  port       Int?
+  apiKey     String?
+  indexName  String?
+  status     String   @default("configured") // 'configured' | 'ready' | 'error'
+  vectorCount Int?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("rag_vector_stores")
+}
+
+// RAG Pipelines
+model RagPipeline {
+  id             String   @id @default(cuid())
+  name           String
+  description    String?
+  dataSources    String[] // Array of data source IDs
+  embeddingModel String   // Embedding model ID
+  vectorStore    String   // Vector store ID
+  status         String   @default("configured") // 'configured' | 'processing' | 'ready' | 'error'
+  documentCount  Int?
+  lastProcessed  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("rag_pipelines")
+}
+
+// AI Agents
+model AiAgent {
+  id            String   @id @default(cuid())
+  name          String
+  description   String
+  type          String   // 'voice' | 'chat'
+  mcpServers    String[] // Array of MCP server IDs
+  vectorStores  String[] // Array of vector store IDs
+  voiceSettings Json?    // Voice settings as JSON
+  chatSettings  Json     // Chat settings as JSON (required for all agents)
+  status        String   @default("configured") // 'configured' | 'ready' | 'running' | 'error'
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("ai_agents")
+}
+
+// Conversation Sessions
+model ConversationSession {
+  id        String   @id @default(cuid())
+  agentId   String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  messages ConversationMessage[]
+
+  @@map("conversation_sessions")
+}
+
+// Conversation Messages
+model ConversationMessage {
+  id          String   @id @default(cuid())
+  sessionId   String
+  role        String   // 'user' | 'assistant' | 'system'
+  content     String
+  timestamp   DateTime @default(now())
+  audioUrl    String?  // For voice messages
+  metadata    Json?    // Additional metadata
+
+  // Relations
+  session ConversationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("conversation_messages")
+}
+
+// API Keys (encrypted storage)
+model ApiKey {
+  id          String   @id @default(cuid())
+  name        String
+  provider    String   // 'openai', 'anthropic', etc.
+  encryptedKey String  // Encrypted API key
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("api_keys")
+}
+
+// System Settings
+model SystemSetting {
+  id    String @id @default(cuid())
+  key   String @unique
+  value String
+  type  String @default("string") // 'string' | 'number' | 'boolean' | 'json'
+
+  @@map("system_settings")
+}

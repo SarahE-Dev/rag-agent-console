@@ -1,0 +1,1 @@
+This is a test document about artificial intelligence and machine learning. AI systems can learn from data and make predictions. Machine learning algorithms include neural networks, decision trees, and support vector machines. Natural language processing helps computers understand human language.
