@@ -325,6 +325,29 @@ export class RagService {
   }
 
   async deleteDataSource(id: string): Promise<boolean> {
+    const dataSource = this.dataSources.get(id)
+    if (!dataSource) return false
+
+    // Delete associated vector store from ChromaDB
+    const vectorStoreId = `datastore_${id}`
+    try {
+      await this.chromaClient.deleteCollection({ name: `rag_${vectorStoreId}` })
+      console.log(`🗑️ Deleted ChromaDB collection: rag_${vectorStoreId}`)
+    } catch (error) {
+      console.warn(`Failed to delete ChromaDB collection rag_${vectorStoreId}:`, error)
+    }
+
+    // Delete associated vector store from memory
+    this.vectorStores.delete(vectorStoreId)
+
+    // Delete from database
+    try {
+      await this.databaseService.deleteRagDataSource(id)
+    } catch (error) {
+      console.error('Failed to delete data source from database:', error)
+    }
+
+    // Delete from memory
     return this.dataSources.delete(id)
   }
 

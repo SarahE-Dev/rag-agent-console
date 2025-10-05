@@ -95,6 +95,20 @@ export function RagConfigurator() {
     loadVectorStores()
   }, [])
 
+  // Listen for vector store creation events
+  useEffect(() => {
+    const handleVectorStoreCreated = () => {
+      loadDataSources()
+      loadVectorStores()
+    }
+
+    window.addEventListener('vectorStoreCreated', handleVectorStoreCreated)
+
+    return () => {
+      window.removeEventListener('vectorStoreCreated', handleVectorStoreCreated)
+    }
+  }, [])
+
   // Reset editing state when dialogs close
   useEffect(() => {
     if (!isDataSourceDialogOpen) {
@@ -180,6 +194,10 @@ export function RagConfigurator() {
       if (createdDataSourceId) {
         await pollProcessingStatus(createdDataSourceId)
       }
+
+      // Refresh the data after successful creation
+      loadDataSources()
+      loadVectorStores()
 
       // Success - close dialog and reset form
       setIsDataSourceDialogOpen(false)
@@ -801,83 +819,83 @@ export function RagConfigurator() {
       </Tabs>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog
-        open={deleteConfirmDialog.isOpen}
-        onOpenChange={(open) => setDeleteConfirmDialog({ isOpen: open, item: null, type: null })}
-      >
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-red-500">
-              <Trash2 className="w-5 h-5" />
-              Delete {deleteConfirmDialog.type === 'datasource' ? 'Data Source' : 'Vector Store'}
-            </DialogTitle>
-            <DialogDescription className="text-muted-foreground">
-              This action cannot be undone. This will permanently delete the{' '}
-              {deleteConfirmDialog.type === 'datasource' ? 'data source' : 'vector store'}{' '}
-              and remove all associated data.
-            </DialogDescription>
-          </DialogHeader>
+    <Dialog
+      open={deleteConfirmDialog.isOpen}
+      onOpenChange={(open) => setDeleteConfirmDialog({ isOpen: open, item: null, type: null })}
+    >
+      <DialogContent className="sm:max-w-[425px]">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2 text-red-500">
+            <Trash2 className="w-5 h-5" />
+            Delete {deleteConfirmDialog.type === 'datasource' ? 'Data Source' : 'Vector Store'}
+          </DialogTitle>
+          <DialogDescription className="text-muted-foreground">
+            This action cannot be undone. This will permanently delete the{' '}
+            {deleteConfirmDialog.type === 'datasource' ? 'data source' : 'vector store'}{' '}
+            and remove all associated data.
+          </DialogDescription>
+        </DialogHeader>
 
-          {deleteConfirmDialog.item && (
-            <div className="py-4">
-              <div className="flex items-center gap-3 p-3 bg-card/50 rounded-lg border border-border/50">
-                <div className="flex items-center gap-2">
-                  {deleteConfirmDialog.type === 'datasource' ? (
-                    <FileText className="w-5 h-5 text-blue-500" />
-                  ) : (
-                    <Database className="w-5 h-5 text-purple-500" />
-                  )}
-                  <div>
-                    <p className="font-semibold text-foreground">{deleteConfirmDialog.item.name}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {deleteConfirmDialog.type === 'datasource'
-                        ? `Type: ${(deleteConfirmDialog.item as DataSource).type}`
-                        : `Provider: ${(deleteConfirmDialog.item as VectorStore).provider}`
-                      }
-                    </p>
-                  </div>
+        {deleteConfirmDialog.item && (
+          <div className="py-4">
+            <div className="flex items-center gap-3 p-3 bg-card/50 rounded-lg border border-border/50">
+              <div className="flex items-center gap-2">
+                {deleteConfirmDialog.type === 'datasource' ? (
+                  <FileText className="w-5 h-5 text-blue-500" />
+                ) : (
+                  <Database className="w-5 h-5 text-purple-500" />
+                )}
+                <div>
+                  <p className="font-semibold text-foreground">{deleteConfirmDialog.item.name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {deleteConfirmDialog.type === 'datasource'
+                      ? `Type: ${(deleteConfirmDialog.item as DataSource).type}`
+                      : `Provider: ${(deleteConfirmDialog.item as VectorStore).provider}`
+                    }
+                  </p>
                 </div>
               </div>
-
-              <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                <p className="text-sm text-red-400 font-medium">
-                  ⚠️ Warning: {deleteConfirmDialog.type === 'datasource'
-                    ? 'All associated vector stores and embeddings will be deleted.'
-                    : 'All stored vectors and search capabilities will be lost.'
-                  }
-                </p>
-              </div>
             </div>
-          )}
 
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              onClick={() => setDeleteConfirmDialog({ isOpen: false, item: null, type: null })}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmDeleteItem}
-              disabled={isDeletingItem !== null}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              {isDeletingItem ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
-                  Deleting...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete {deleteConfirmDialog.type === 'datasource' ? 'Data Source' : 'Vector Store'}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <div className="mt-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+              <p className="text-sm text-red-400 font-medium">
+                ⚠️ Warning: {deleteConfirmDialog.type === 'datasource'
+                  ? 'All associated vector stores and embeddings will be deleted.'
+                  : 'All stored vectors and search capabilities will be lost.'
+                }
+              </p>
+            </div>
+          </div>
+        )}
+
+        <DialogFooter className="gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setDeleteConfirmDialog({ isOpen: false, item: null, type: null })}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={confirmDeleteItem}
+            disabled={isDeletingItem !== null}
+            className="bg-red-600 hover:bg-red-700"
+          >
+            {isDeletingItem ? (
+              <>
+                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin mr-2" />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <Trash2 className="w-4 h-4 mr-2" />
+                Delete {deleteConfirmDialog.type === 'datasource' ? 'Data Source' : 'Vector Store'}
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </div>
   )
 }

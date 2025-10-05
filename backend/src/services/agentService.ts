@@ -63,6 +63,28 @@ export class AgentService {
         }
         this.agents.set(agent.id, typedAgent)
       }
+      // Clean up references to non-existent vector stores
+      for (const agent of this.agents.values()) {
+        if (agent.vectorStores && agent.vectorStores.length > 0) {
+          const validVectorStores = agent.vectorStores.filter(storeId => {
+            const exists = this.ragService.getVectorStore(storeId)
+            if (!exists) {
+              console.log(`🧹 Removed reference to deleted vector store ${storeId} from agent ${agent.name}`)
+            }
+            return exists
+          })
+          if (validVectorStores.length !== agent.vectorStores.length) {
+            agent.vectorStores = validVectorStores
+            // Update in database
+            try {
+              await this.dbService.updateAiAgent(agent.id, { vectorStores: agent.vectorStores })
+            } catch (error) {
+              console.error(`Failed to update agent ${agent.name} after vector store cleanup:`, error)
+            }
+          }
+        }
+      }
+
       console.log(`Loaded ${dbAgents.length} agents from database`)
     } catch (error) {
       console.error('Failed to load agents from database:', error)

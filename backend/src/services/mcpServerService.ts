@@ -97,6 +97,7 @@ export class McpServerService {
       const serverProcess = spawn(server.command, server.args, {
         env: { ...process.env, ...server.env },
         stdio: ['pipe', 'pipe', 'pipe'],
+        cwd: require('path').resolve(process.cwd(), '..'), // Run from project root, not backend/
       })
 
       server.process = serverProcess
