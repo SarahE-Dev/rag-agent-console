@@ -324,7 +324,10 @@ export function VoiceChatInterface() {
     if (!selectedAgent) return
 
     try {
+      // Show notification that audio is being generated
+      showNotification('🎵 Generating audio...', 'info')
       setIsPlaying(true)
+      
       const response = await fetch(`/api/agents/${selectedAgent}/speak`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -340,14 +343,21 @@ export function VoiceChatInterface() {
         audio.onended = () => {
           setIsPlaying(false)
           currentAudioRef.current = null
+          URL.revokeObjectURL(audioUrl) // Clean up
         }
 
         audio.onerror = () => {
           setIsPlaying(false)
           currentAudioRef.current = null
+          URL.revokeObjectURL(audioUrl) // Clean up
         }
 
-        audio.play()
+        // Start playing as soon as possible
+        audio.play().catch(err => {
+          console.error('Audio playback failed:', err)
+          setIsPlaying(false)
+          currentAudioRef.current = null
+        })
       } else {
         console.error('Failed to synthesize speech:', await response.text())
         setIsPlaying(false)

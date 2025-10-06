@@ -412,7 +412,25 @@ export class McpServerService {
         })
 
         console.log(`[MCP ${server.name}] Tool ${toolName} result:`, result)
-        return result
+        
+        // Extract text content from MCP response
+        // MCP returns: { content: [{ type: 'text', text: '...' }], isError: false }
+        if (result && result.content && Array.isArray(result.content)) {
+          // Concatenate all text content
+          const textContent = result.content
+            .filter((item: any) => item.type === 'text')
+            .map((item: any) => item.text)
+            .join('\n')
+          
+          if (result.isError) {
+            throw new Error(textContent || 'Tool execution failed')
+          }
+          
+          return textContent
+        }
+        
+        // Fallback: return the raw result if format is unexpected
+        return JSON.stringify(result)
       } catch (mcpError) {
         console.log(`[MCP ${server.name}] MCP tool execution failed:`, (mcpError as Error).message)
         throw new Error(`Tool execution failed: ${toolName}`)
