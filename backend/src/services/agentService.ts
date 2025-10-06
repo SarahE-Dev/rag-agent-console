@@ -409,7 +409,12 @@ export class AgentService {
                 try {
                   console.log(`[TOOL] Calling MCP server ${serverId} for tool: ${toolName}`)
                   result = await this.mcpService.executeTool(serverId, toolName, args)
-                  console.log(`[TOOL] Result from ${toolName}:`, result?.substring(0, 200))
+                  
+                  // Log the result (handle both string and object responses)
+                  const resultPreview = typeof result === 'string' 
+                    ? result.substring(0, 200) 
+                    : JSON.stringify(result).substring(0, 200)
+                  console.log(`[TOOL] Result from ${toolName}:`, resultPreview)
                 } catch (error) {
                   console.error(`[TOOL] Error calling MCP server:`, error)
                   result = `Error executing tool "${toolName}": ${error}. Please ensure the MCP server is running and configured.`
@@ -428,14 +433,23 @@ export class AgentService {
         }
 
         // Generate final response with tool results
-        const toolMessage: OpenAI.Chat.Completions.ChatCompletionMessageParam = {
+        // First, add the assistant's message with tool calls
+        const assistantMessage: OpenAI.Chat.Completions.ChatCompletionMessageParam = {
           role: 'assistant',
-          content: toolResults.join('\n'),
+          content: null,
+          tool_calls: toolCalls
         }
+
+        // Then add tool result messages
+        const toolMessages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = toolCalls.map((toolCall, index) => ({
+          role: 'tool' as const,
+          tool_call_id: toolCall.id,
+          content: toolResults[index] || 'No result'
+        }))
 
         const finalCompletion = await this.getOpenAIClient().chat.completions.create({
           model: chatSettings.model,
-          messages: [...chatMessages, toolMessage],
+          messages: [...chatMessages, assistantMessage, ...toolMessages],
           temperature: chatSettings.temperature,
           max_tokens: chatSettings.maxTokens,
         })

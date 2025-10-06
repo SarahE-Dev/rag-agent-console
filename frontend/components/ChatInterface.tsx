@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/Input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/Select'
 import { Badge } from '@/components/ui/Badge'
-import { Send, Bot, Mic, MicOff, Volume2, Play, Square, AlertTriangle } from 'lucide-react'
+import { Send, Bot, Mic, MicOff, Volume2, Play, Square, AlertTriangle, RotateCcw } from 'lucide-react'
 import { TypewriterText } from './TypewriterText'
 
 interface Message {
@@ -238,6 +238,12 @@ export function ChatInterface() {
     }
   }
 
+  const clearConversation = () => {
+    setMessages([])
+    setInput('')
+    setTypingMessageId(null)
+  }
+
   const getAgentTypeIcon = (type: string) => {
     return type === 'voice' ? <Mic className="w-4 h-4" /> : <Bot className="w-4 h-4" />
   }
@@ -407,6 +413,17 @@ export function ChatInterface() {
                 disabled={!selectedAgent || isLoading || !isAgentRunning}
                 className="flex-1 cyber-input font-mono text-base"
               />
+              {messages.length > 0 && (
+                <Button
+                  onClick={clearConversation}
+                  variant="outline"
+                  size="lg"
+                  className="hover:shadow-neon-pink transition-all duration-300 border-neon-pink/50"
+                  title="Clear conversation"
+                >
+                  <RotateCcw className="w-5 h-5" />
+                </Button>
+              )}
               {isVoiceAgent && isAgentRunning && (
                 <Button
                   onClick={isRecording ? stopRecording : startRecording}
