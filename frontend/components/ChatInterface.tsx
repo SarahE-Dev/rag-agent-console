@@ -97,11 +97,15 @@ export function ChatInterface() {
     setIsLoading(true)
 
     try {
+      // Keep only the last 6 messages (3 exchanges) to avoid context length issues
+      const maxHistoryMessages = 6
+      const recentMessages = messages.slice(-maxHistoryMessages)
+      
       const response = await fetch(`/api/agents/${selectedAgent}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [...messages.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: input }]
+          messages: [...recentMessages.map(m => ({ role: m.role, content: m.content })), { role: 'user', content: input }]
         }),
       })
 

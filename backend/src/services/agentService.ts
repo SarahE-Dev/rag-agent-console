@@ -13,7 +13,7 @@ export interface VoiceSettings {
 }
 
 export interface ChatSettings {
-  model: 'gpt-3.5-turbo' | 'gpt-4' | 'gpt-4-turbo' | 'claude-3-sonnet' | 'claude-3-haiku'
+  model: 'gpt-3.5-turbo' | 'gpt-4' | 'gpt-4-turbo' | 'gpt-4o' | 'claude-3-sonnet' | 'claude-3-haiku'
   temperature: number
   maxTokens: number
   systemPrompt?: string
@@ -320,8 +320,12 @@ export class AgentService {
         })
       }
 
-      // Add conversation history
-      chatMessages.push(...messages.map(msg => ({
+      // Add conversation history with trimming to avoid context length errors
+      // Keep only the last N messages to stay within token limits
+      const maxHistoryMessages = 10 // Keep last 10 messages (5 exchanges)
+      const trimmedMessages = messages.slice(-maxHistoryMessages)
+      
+      chatMessages.push(...trimmedMessages.map(msg => ({
         role: msg.role,
         content: msg.content
       })) as OpenAI.Chat.Completions.ChatCompletionMessageParam[])

@@ -35,7 +35,7 @@ interface VoiceSettings {
 }
 
 interface ChatSettings {
-  model: 'gpt-3.5-turbo' | 'gpt-4' | 'gpt-4-turbo' | 'claude-3-sonnet' | 'claude-3-haiku'
+  model: 'gpt-3.5-turbo' | 'gpt-4' | 'gpt-4-turbo' | 'gpt-4o' | 'claude-3-sonnet' | 'claude-3-haiku'
   temperature: number
   maxTokens: number
   systemPrompt?: string
@@ -95,9 +95,9 @@ export function AgentConfigurator() {
       systemPrompt: 'You are a helpful voice assistant. Keep your responses conversational and natural, as if speaking to someone. Be concise but informative.',
     },
     chatSettings: {
-      model: 'gpt-4',
+      model: 'gpt-4o',
       temperature: 0.7,
-      maxTokens: 2048,
+      maxTokens: 1000,
       systemPrompt: '',
       functions: [],
     },
@@ -219,9 +219,9 @@ export function AgentConfigurator() {
             systemPrompt: 'You are a helpful voice assistant. Keep your responses conversational and natural, as if speaking to someone. Be concise but informative.',
           },
           chatSettings: {
-            model: 'gpt-4',
+            model: 'gpt-4o',
             temperature: 0.7,
-            maxTokens: 2048,
+            maxTokens: 1000,
             systemPrompt: '',
             functions: [],
           },
@@ -249,9 +249,9 @@ export function AgentConfigurator() {
         systemPrompt: agent.voiceSettings?.systemPrompt || 'You are a helpful voice assistant. Keep your responses conversational and natural, as if speaking to someone. Be concise but informative.',
       },
       chatSettings: {
-        model: agent.chatSettings?.model || 'gpt-4',
+        model: agent.chatSettings?.model || 'gpt-4o',
         temperature: agent.chatSettings?.temperature || 0.7,
-        maxTokens: agent.chatSettings?.maxTokens || 2048,
+        maxTokens: agent.chatSettings?.maxTokens || 1000,
         systemPrompt: agent.chatSettings?.systemPrompt || '',
         functions: agent.chatSettings?.functions || [],
       },
@@ -484,9 +484,10 @@ export function AgentConfigurator() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo</SelectItem>
-                        <SelectItem value="gpt-4">GPT-4</SelectItem>
-                        <SelectItem value="gpt-4-turbo">GPT-4 Turbo</SelectItem>
+                        <SelectItem value="gpt-3.5-turbo">GPT-3.5 Turbo (16K context)</SelectItem>
+                        <SelectItem value="gpt-4">GPT-4 (8K context)</SelectItem>
+                        <SelectItem value="gpt-4-turbo">GPT-4 Turbo (128K context)</SelectItem>
+                        <SelectItem value="gpt-4o">GPT-4o (128K context) - Recommended</SelectItem>
                         <SelectItem value="claude-3-sonnet">Claude 3 Sonnet</SelectItem>
                         <SelectItem value="claude-3-haiku">Claude 3 Haiku</SelectItem>
                       </SelectContent>
