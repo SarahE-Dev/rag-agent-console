@@ -364,6 +364,25 @@ export class AgentService {
         }
 
         console.log(`📍 Total tools available: ${availableTools.length}`)
+        
+        // Add tool usage instruction to system prompt when tools are available
+        if (availableTools.length > 0) {
+          const toolInstruction = `\n\nIMPORTANT: You have access to real-time tools. For location-based queries (restaurants, directions, places, etc.), ALWAYS use the available tools to provide accurate, current information. Do NOT rely on your training data for specific locations or businesses.`
+          
+          // Update the system message to include tool instructions
+          const systemMessageIndex = chatMessages.findIndex(msg => msg.role === 'system')
+          if (systemMessageIndex >= 0) {
+            chatMessages[systemMessageIndex] = {
+              ...chatMessages[systemMessageIndex],
+              content: (chatMessages[systemMessageIndex].content as string) + toolInstruction
+            }
+          } else {
+            chatMessages.unshift({
+              role: 'system',
+              content: toolInstruction
+            })
+          }
+        }
       }
 
       console.log(`🤖 Creating completion with ${availableTools.length} tools`)

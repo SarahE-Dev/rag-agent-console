@@ -381,24 +381,47 @@ export function AgentConfigurator() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid grid-cols-4 items-center gap-4">
-                <Label htmlFor="agent-rag" className="text-right">Vector Stores</Label>
-                <Select value={newAgent.vectorStores.join(',')} onValueChange={(value) => setNewAgent(prev => ({ ...prev, vectorStores: value.split(',').filter(Boolean) }))}>
-                  <SelectTrigger className="col-span-3">
-                    <SelectValue placeholder="Select vector stores containing your data" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {vectorStores.length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground">No vector stores available. Upload and process data sources first.</div>
-                    ) : (
-                      vectorStores.map((store) => (
-                        <SelectItem key={store.id} value={store.id}>
-                          {store.name} ({store.vectorCount || 0} vectors)
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-4 items-start gap-4">
+                <Label htmlFor="agent-rag" className="text-right pt-2">Vector Stores</Label>
+                <div className="col-span-3 space-y-2">
+                  {vectorStores.length === 0 ? (
+                    <div className="p-3 text-sm text-muted-foreground border border-border/50 rounded-md bg-card/50">
+                      No vector stores available. Upload and process data sources first.
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[200px] overflow-y-auto border border-border/50 rounded-md p-3 bg-card/30">
+                      {vectorStores.map((store) => (
+                        <label
+                          key={store.id}
+                          className="flex items-center gap-2 p-2 hover:bg-accent/50 rounded-md cursor-pointer transition-colors"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={newAgent.vectorStores.includes(store.id)}
+                            onChange={(e) => {
+                              const checked = e.target.checked
+                              setNewAgent(prev => ({
+                                ...prev,
+                                vectorStores: checked
+                                  ? [...prev.vectorStores, store.id]
+                                  : prev.vectorStores.filter(id => id !== store.id)
+                              }))
+                            }}
+                            className="w-4 h-4 rounded border-border"
+                          />
+                          <span className="text-sm flex-1">
+                            {store.name} <span className="text-muted-foreground">({store.vectorCount || 0} vectors)</span>
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                  {newAgent.vectorStores.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      ✓ Selected {newAgent.vectorStores.length} vector store{newAgent.vectorStores.length > 1 ? 's' : ''}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {newAgent.type === 'voice' && (
